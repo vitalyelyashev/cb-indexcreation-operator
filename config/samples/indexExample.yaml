@@ -1,0 +1,14 @@
+apiVersion: cache.forescout.com/v1alpha1
+kind: CouchbaseIndex
+metadata:
+  name: sample
+  namespace: cb-indexcreation-operator-system
+spec:
+  # Add fields here
+  cbClusterSecret: "cb-creds"
+  indexdata:
+    bucketname: "test"
+    indexname: "example"
+    parameters:
+      - "firstField ASC"
+      - "secondField DESC"

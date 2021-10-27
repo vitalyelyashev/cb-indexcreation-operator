@@ -1,0 +1,20 @@
+# permissions for end users to view couchbaseindices.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: couchbaseindex-viewer-role
+rules:
+- apiGroups:
+  - cache.forescout.com
+  resources:
+  - couchbaseindices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cache.forescout.com
+  resources:
+  - couchbaseindices/status
+  verbs:
+  - get

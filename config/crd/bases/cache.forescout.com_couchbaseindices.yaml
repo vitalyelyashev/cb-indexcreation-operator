@@ -1,0 +1,77 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: couchbaseindices.cache.forescout.com
+spec:
+  group: cache.forescout.com
+  names:
+    kind: CouchbaseIndex
+    listKind: CouchbaseIndexList
+    plural: couchbaseindices
+    singular: couchbaseindex
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CouchbaseIndex is the Schema for the couchbaseindices API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CouchbaseIndexSpec defines the desired state of CouchbaseIndices
+            properties:
+              cbClusterSecret:
+                description: INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Secret Name, contains details of connection to couchbase cluster
+                type: string
+              indexdata:
+                description: IndexData is an objects, contains  all the data for  generating
+                  couchbase index
+                properties:
+                  bucketname:
+                    type: string
+                  indexname:
+                    type: string
+                  isprimary:
+                    type: boolean
+                  parameters:
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+          status:
+            description: CouchbaseIndexStatus defines the observed state of CouchbaseIndex
+            properties:
+              conditiontype:
+                type: string
+            required:
+            - conditiontype
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
