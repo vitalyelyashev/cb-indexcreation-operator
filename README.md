@@ -4,7 +4,17 @@ This operator allows to create Couchbase query indexes declaratively.
 Description:
 What you can do with the operator:
 1. Create both primary a and regular indexes using yamls. There are examples in /config/samples for both use cases
-2. Connection details to the cluster provided by external secret (configurable)
+2. Connection details to the cluster provided by external secret (configurable). Example secret:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cb-creds
+  namespace: cb-indexcreation-operator-system
+stringData:
+  url: "testcluster.couchbase-operator.svc.cluster.local"
+  username: "Administrator"
+  password: 
 
 What you cannot do with the operator:
 1. There is no update/delete index support as for now.
