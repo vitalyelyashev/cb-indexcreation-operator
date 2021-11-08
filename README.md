@@ -15,7 +15,7 @@ metadata:
 stringData:
   url: "testcluster.couchbase-operator.svc.cluster.local"
   username: "Administrator"
-  password: 
+  password: "yourPassword"
 ```
 What you cannot do with the operator:
 1. There is no update/delete index support as for now.
