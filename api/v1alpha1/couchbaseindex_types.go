@@ -55,7 +55,10 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status`
+// +kubebuilder:printcolumn:name="BucketName",type=string,JSONPath=`.spec.indexdata.bucketname`
+// +kubebuilder:printcolumn:name="IndexName",type=string,JSONPath=`.spec.indexdata.indexname`
+// +kubebuilder:printcolumn:name="IsPrimary",type=boolean,JSONPath=`.spec.indexdata.isprimary`
 // CouchbaseIndex is the Schema for the couchbaseindices API
 type CouchbaseIndex struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -66,7 +69,6 @@ type CouchbaseIndex struct {
 }
 
 //+kubebuilder:object:root=true
-
 // CouchbaseIndexList contains a list of CouchbaseIndex
 type CouchbaseIndexList struct {
 	metav1.TypeMeta `json:",inline"`

@@ -16,7 +16,20 @@ spec:
     singular: couchbaseindex
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status
+      name: Status
+      type: string
+    - jsonPath: .spec.indexdata.bucketname
+      name: BucketName
+      type: string
+    - jsonPath: .spec.indexdata.indexname
+      name: IndexName
+      type: string
+    - jsonPath: .spec.indexdata.isprimary
+      name: IsPrimary
+      type: boolean
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: CouchbaseIndex is the Schema for the couchbaseindices API

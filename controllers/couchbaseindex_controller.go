@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -61,7 +62,7 @@ func (r *CouchbaseIndexReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	_ = log.FromContext(ctx)
 
 	mylog.Info("Start reconciliation")
-	// your logic here
+
 	couchbaseIndex := &cachev1alpha1.CouchbaseIndex{}
 
 	err := r.Get(ctx, req.NamespacedName, couchbaseIndex)
@@ -80,17 +81,13 @@ func (r *CouchbaseIndexReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	//connection := couchbaseIndex.Spec.Connection
 	indexData := couchbaseIndex.Spec.Index
 
 	//Connect to Couchbase Cluster
 	cluster, err := gocb.Connect(
-		//connection.Url,
 		url,
 		gocb.ClusterOptions{
-			//Username: connection.Username,
 			Username: username,
-			//Password: connection.Password,
 			Password: password,
 		})
 	if err != nil {
@@ -102,6 +99,22 @@ func (r *CouchbaseIndexReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	mylog.Info("Succesfully connected to couchbase cluster", "ConnectionUrl:", url, "Username:", username, "Password:", password)
 
 	qi := cluster.QueryIndexes()
+	if !controllerutil.ContainsFinalizer(couchbaseIndex, "finalizers.couchbaseIndex") {
+		controllerutil.AddFinalizer(couchbaseIndex, "finalizers.couchbaseIndex")
+		if err := r.Update(ctx, couchbaseIndex); err != nil {
+			mylog.Error(err, "unable to register finalizer")
+			return ctrl.Result{}, err
+		} else {
+			mylog.Info("Successfully added a finalizer")
+		}
+	}
+
+	isIndexMarkedtoBeDeleted := couchbaseIndex.GetDeletionTimestamp() != nil
+
+	if isIndexMarkedtoBeDeleted {
+
+		return reconcileDelete(r, ctx, indexData, qi, couchbaseIndex)
+	}
 
 	mylog.Info("Index status: ", "current status", couchbaseIndex.Status.Type)
 
@@ -110,7 +123,7 @@ func (r *CouchbaseIndexReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	case cachev1alpha1.ConditionInProgress:
 		mylog.Info("the status is InProgress - Check if Index already created")
 
-		isExist, err := isIndexExist(indexData.IndexName, indexData.BucketName, indexData.DeepCopy().IsPrimary, cluster)
+		isExist, index, err := isIndexExist(indexData.IndexName, indexData.BucketName, indexData.DeepCopy().IsPrimary, cluster)
 		if err != nil {
 			mylog.Error(err, "Failed to get index")
 
@@ -124,6 +137,7 @@ func (r *CouchbaseIndexReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		} else {
+			UpdateIndexIfNeeded(index, indexData, qi)
 			couchbaseIndex.Status.Type = cachev1alpha1.ConditionReady
 			r.Status().Update(ctx, couchbaseIndex)
 			return ctrl.Result{}, nil
@@ -162,6 +176,33 @@ func (r *CouchbaseIndexReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+func reconcileDelete(r *CouchbaseIndexReconciler,
+	ctx context.Context,
+	indexData cachev1alpha1.IndexData,
+	qi *gocb.QueryIndexManager,
+	couchbaseIndex *cachev1alpha1.CouchbaseIndex) (ctrl.Result, error) {
+	mylog.Info("Index should be deleted")
+	var err error
+	if indexData.IsPrimary {
+		err = qi.DropPrimaryIndex(indexData.BucketName, &gocb.DropPrimaryQueryIndexOptions{})
+	} else {
+		err = qi.DropIndex(indexData.BucketName, indexData.IndexName, &gocb.DropQueryIndexOptions{})
+	}
+
+	if err != nil {
+		mylog.Error(err, "Failed to delete a index")
+	} else {
+		mylog.Info("Succesfully removed index.", "IndexName:", indexData.IndexName)
+		controllerutil.RemoveFinalizer(couchbaseIndex, "finalizers.couchbaseIndex")
+		if err := r.Update(ctx, couchbaseIndex); err != nil {
+			mylog.Error(err, "unable to remove finalizer")
+			return ctrl.Result{}, err
+		} else {
+			mylog.Info("Successfully removed a finalizer")
+		}
+	}
+	return ctrl.Result{}, nil
+}
 func createIndex(
 	indexData cachev1alpha1.IndexData,
 	cluster *gocb.Cluster,
@@ -169,7 +210,7 @@ func createIndex(
 	r *CouchbaseIndexReconciler,
 	ctx context.Context,
 	qi *gocb.QueryIndexManager) (err error) {
-	isExist, err := isIndexExist(indexData.IndexName, indexData.BucketName, indexData.IsPrimary, cluster)
+	isExist, index, err := isIndexExist(indexData.IndexName, indexData.BucketName, indexData.IsPrimary, cluster)
 	mylog.Info("the status is Not Exists - try to create an index")
 	if err != nil {
 		mylog.Error(err, "Failed to get an index")
@@ -211,13 +252,19 @@ func createIndex(
 
 		return nil
 	} else {
+		UpdateIndexIfNeeded(index, indexData, qi)
 		mylog.Info("Index already exists")
 		couchbaseIndex.Status.Type = cachev1alpha1.ConditionReady
 		r.Status().Update(ctx, couchbaseIndex)
 	}
 	return nil
 }
-func isIndexExist(name string, bucket string, isPrimary bool, cluster *gocb.Cluster) (found bool, err error) {
+func UpdateIndexIfNeeded(index gocb.QueryIndex, indexData cachev1alpha1.IndexData, qi *gocb.QueryIndexManager) {
+
+	//qi.CreateIndex()
+	mylog.Info("The index is already exists", "Condition", index.Condition, "Key:", index.IndexKey, "Type:", index.Type)
+}
+func isIndexExist(name string, bucket string, isPrimary bool, cluster *gocb.Cluster) (found bool, index gocb.QueryIndex, err error) {
 	qi := cluster.QueryIndexes()
 	if isPrimary {
 		name = "#primary"
@@ -230,6 +277,7 @@ func isIndexExist(name string, bucket string, isPrimary bool, cluster *gocb.Clus
 	for _, i := range all {
 		if i.Name == name {
 			found = true
+			index = i
 			break
 		}
 	}
